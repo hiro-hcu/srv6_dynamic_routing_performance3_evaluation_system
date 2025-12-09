@@ -1,0 +1,40 @@
+FROM ubuntu:22.04
+
+RUN apt update && apt install -y \
+    iproute2 iputils-ping curl net-tools tcpdump openssh-server \
+    nftables kmod \
+    snmpd snmp \
+    snmp-mibs-downloader 
+
+RUN download-mibs
+
+# SRv6はカーネルレベル（iproute2）で処理
+# SRv6設定は起動時のsrv6_setup.shで動的に実行 
+
+
+# 行頭が mibs : で始まる行を # mibs : に変える
+RUN sed -i 's/^mibs\s*:/# &/' /etc/snmp/snmp.conf
+
+# SSH設定 - r1専用
+RUN mkdir -p /var/run/sshd && \
+    # rootログインを有効化
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    # パスワード認証を有効化
+    echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config && \
+    # rootパスワードを設定
+    echo 'root:@k@n@3>ki' | chpasswd
+
+# SNMPポートを開ける（Dockerホストと通信する場合）
+EXPOSE 161/udp
+# SSHポートを開ける
+EXPOSE 22
+
+COPY snmpd/snmpd.conf /etc/snmp/snmpd.conf
+COPY scripts/srv6_setup.sh /usr/local/bin/srv6_setup.sh
+COPY scripts/set_bandwidth_limit.sh /usr/local/bin/set_bandwidth_limit.sh
+RUN chmod +x /usr/local/bin/srv6_setup.sh /usr/local/bin/set_bandwidth_limit.sh
+COPY scripts/r1_startup.sh /usr/local/bin/r1_startup.sh
+RUN chmod +x /usr/local/bin/r1_startup.sh
+
+# r1専用起動スクリプトを実行
+CMD ["/usr/local/bin/r1_startup.sh"]

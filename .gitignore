@@ -1,0 +1,61 @@
+# Docker関連
+.env
+docker-compose.override.yml
+
+# ログファイル
+*.log
+logs/
+
+# RRDファイル（データベースファイル）
+*.rrd
+
+# MRTG生成ファイル
+controller/mrtg/mrtg_file/*.png
+controller/mrtg/mrtg_file/*.html
+controller/mrtg/mrtg_file/mrtg.log
+
+# NetworkXで生成される画像ファイル
+controller/data_to_networkx/*.png
+controller/networkx_test/*.png
+controller/srv6_network_topology_*.png
+
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 一時ファイル
+*.tmp
+*.temp
+*~
+
+# OS関連
+.DS_Store
+Thumbs.db
+
+# VSCode関連
+.vscode/
+
+# IDEファイル
+.idea/
+
+# バックアップファイル
+*.bak
+*.backup
