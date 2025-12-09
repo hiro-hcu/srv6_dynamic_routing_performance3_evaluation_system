@@ -195,7 +195,7 @@ class RRDDataManager:
         for u, v in graph.edges():
             edge_key = (u, v) if (u, v) in self.config.rrd_paths else (v, u)
             rrd_path = self.config.rrd_paths.get(edge_key)
-            max_bandwidth = graph[u][v].get('max_bandwidth', 125_000_000)  # デフォルト1Gbps
+            max_bandwidth = graph[u][v].get('max_bandwidth', 62_500_000)  # デフォルト0.5Gbps
             
             if rrd_path:
                 out_bytes_per_sec = self.fetch_rrd_data(rrd_path)
@@ -381,10 +381,10 @@ class PathCalculator:
         self._create_topology()
     
     def _create_topology(self):
-        """ネットワークトポロジ作成（最大帯域幅: 1Gbps = 125,000,000 Bytes/s）"""
+        """ネットワークトポロジ作成（最大帯域幅: 0.5Gbps = 62,500,000 Bytes/s）"""
         self.graph.add_nodes_from(range(1, 17))  # r1-r16
-        # 全リンクの最大帯域幅: 1Gbps = 1,000,000,000 bps = 125,000,000 Bytes/s
-        max_bandwidth = 125_000_000  # Bytes/s (tcコマンドで1Gbpsに制限)
+        # 全リンクの最大帯域幅: 0.5Gbps = 500,000,000 bps = 62,500,000 Bytes/s
+        max_bandwidth = 62_500_000  # Bytes/s (tcコマンドで0.5Gbpsに制限)
         edges = [
             (1, 2, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
             (1, 3, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
