@@ -162,12 +162,14 @@ class RRDDataManager:
                 return None
             
             # 最新の有効データを検索
+            # RRDファイルには ds0(in) と ds1(out) の2つのデータソースがある
+            # 出力トラフィック（ds1 = out）を使用帯域として使用
             data_lines = lines[2:]
             for line in reversed(data_lines):
                 if ':' in line:
                     parts = line.split()
-                    if len(parts) >= 2:
-                        val_str = parts[1]
+                    if len(parts) >= 3:  # timestamp, ds0, ds1
+                        val_str = parts[2]  # ds1 = out（出力トラフィック）
                         if val_str.lower() not in ['-nan', 'nan']:
                             try:
                                 val = float(val_str)
@@ -206,9 +208,17 @@ class RRDDataManager:
                     # 最小重み値を保証（0の場合でも0.0001以上）
                     graph[u][v]['weight'] = max(utilization, min_weight)
                     
-                    # 表示用単位変換
-                    display_val = round(out_bytes_per_sec * 8 / 1_000_000, 2) if out_bytes_per_sec >= 1000 else round(out_bytes_per_sec, 3)
-                    unit = "Mbps" if out_bytes_per_sec >= 1000 else "bps"
+                    # 表示用単位変換（バイト/秒 → bps → Mbps）
+                    bps = out_bytes_per_sec * 8  # バイト/秒 → ビット/秒
+                    if bps >= 1_000_000:
+                        display_val = round(bps / 1_000_000, 2)
+                        unit = "Mbps"
+                    elif bps >= 1_000:
+                        display_val = round(bps / 1_000, 2)
+                        unit = "Kbps"
+                    else:
+                        display_val = round(bps, 2)
+                        unit = "bps"
                     
                     logger.info(f"Edge r{u} <-> r{v}: {display_val} {unit} (利用率: {utilization:.4f})")
                     update_count += 1
@@ -384,32 +394,33 @@ class PathCalculator:
         """ネットワークトポロジ作成（最大帯域幅: 0.5Gbps = 62,500,000 Bytes/s）"""
         self.graph.add_nodes_from(range(1, 17))  # r1-r16
         # 全リンクの最大帯域幅: 0.5Gbps = 500,000,000 bps = 62,500,000 Bytes/s
-        max_bandwidth = 62_500_000  # Bytes/s (tcコマンドで0.5Gbpsに制限)
+        max_bandwidth_05G = 62_500_000  # Bytes/s (tcコマンドで0.5Gbpsに制限)
+        max_bandwidth_1G = 125_000_000  # Bytes/s (tcコマンドで1Gbpsに制限)
         edges = [
-            (1, 2, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (1, 3, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (2, 4, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (2, 5, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (3, 5, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (3, 6, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (4, 7, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (4, 8, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (5, 8, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (5, 9, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (6, 9, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (6, 10, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (7, 11, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (8, 11, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (8, 12, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (9, 12, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (9, 13, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (10, 13, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (11, 14, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (12, 14, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (12, 15, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (13, 15, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (14, 16, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
-            (15, 16, {'weight': 0.0001, 'max_bandwidth': max_bandwidth}),
+            (1, 2, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (1, 3, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (2, 4, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (2, 5, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (3, 5, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (3, 6, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (4, 7, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (4, 8, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (5, 8, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (5, 9, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (6, 9, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (6, 10, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (7, 11, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (8, 11, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (8, 12, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (9, 12, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (9, 13, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (10, 13, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_05G}),
+            (11, 14, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (12, 14, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (12, 15, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (13, 15, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (14, 16, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
+            (15, 16, {'weight': 0.0001, 'max_bandwidth': max_bandwidth_1G}),
         ]
         self.graph.add_edges_from(edges)
     
