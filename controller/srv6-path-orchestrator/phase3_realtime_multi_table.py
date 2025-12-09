@@ -163,20 +163,38 @@ class RRDDataManager:
             
             # 最新の有効データを検索
             # RRDファイルには ds0(in) と ds1(out) の2つのデータソースがある
-            # 出力トラフィック（ds1 = out）を使用帯域として使用
+            # 両方向のトラフィックの最大値を使用
             data_lines = lines[2:]
             for line in reversed(data_lines):
                 if ':' in line:
                     parts = line.split()
                     if len(parts) >= 3:  # timestamp, ds0, ds1
-                        val_str = parts[2]  # ds1 = out（出力トラフィック）
-                        if val_str.lower() not in ['-nan', 'nan']:
-                            try:
-                                val = float(val_str)
-                                if not math.isnan(val):
-                                    return val
-                            except ValueError:
-                                continue
+                        try:
+                            ds0_str = parts[1]  # in
+                            ds1_str = parts[2]  # out
+                            
+                            ds0_val = None
+                            ds1_val = None
+                            
+                            if ds0_str.lower() not in ['-nan', 'nan']:
+                                ds0_val = float(ds0_str)
+                                if math.isnan(ds0_val):
+                                    ds0_val = None
+                            
+                            if ds1_str.lower() not in ['-nan', 'nan']:
+                                ds1_val = float(ds1_str)
+                                if math.isnan(ds1_val):
+                                    ds1_val = None
+                            
+                            # 有効な値がある場合、最大値を返す（in/outの大きい方）
+                            if ds0_val is not None and ds1_val is not None:
+                                return max(ds0_val, ds1_val)
+                            elif ds0_val is not None:
+                                return ds0_val
+                            elif ds1_val is not None:
+                                return ds1_val
+                        except ValueError:
+                            continue
             
             return None
             
