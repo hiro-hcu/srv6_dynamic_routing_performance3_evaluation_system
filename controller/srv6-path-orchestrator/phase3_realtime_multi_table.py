@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 warnings.filterwarnings('ignore', message='.*Glyph.*missing from.*font.*')
 
+# ============================================================================
+# 設定変数（ここでカスタマイズ可能）
+# ============================================================================
+# 履歴保存先ディレクトリ名（visualization/以下のパス）
+HISTORY_SAVE_DIR = "srv6_evaluation3_tcp"
+
+# 測定停止時間（分）- この時間が経過すると自動停止
+MEASUREMENT_DURATION_MINUTES = 52
+# ============================================================================
+
 @dataclass
 class SRv6Config:
     """SRv6統合設定クラス"""
@@ -163,38 +173,20 @@ class RRDDataManager:
             
             # 最新の有効データを検索
             # RRDファイルには ds0(in) と ds1(out) の2つのデータソースがある
-            # 両方向のトラフィックの最大値を使用
+            # 出力トラフィック（ds1 = out）を使用帯域として使用
             data_lines = lines[2:]
             for line in reversed(data_lines):
                 if ':' in line:
                     parts = line.split()
                     if len(parts) >= 3:  # timestamp, ds0, ds1
-                        try:
-                            ds0_str = parts[1]  # in
-                            ds1_str = parts[2]  # out
-                            
-                            ds0_val = None
-                            ds1_val = None
-                            
-                            if ds0_str.lower() not in ['-nan', 'nan']:
-                                ds0_val = float(ds0_str)
-                                if math.isnan(ds0_val):
-                                    ds0_val = None
-                            
-                            if ds1_str.lower() not in ['-nan', 'nan']:
-                                ds1_val = float(ds1_str)
-                                if math.isnan(ds1_val):
-                                    ds1_val = None
-                            
-                            # 有効な値がある場合、最大値を返す（in/outの大きい方）
-                            if ds0_val is not None and ds1_val is not None:
-                                return max(ds0_val, ds1_val)
-                            elif ds0_val is not None:
-                                return ds0_val
-                            elif ds1_val is not None:
-                                return ds1_val
-                        except ValueError:
-                            continue
+                        val_str = parts[2]  # ds1 = out（出力トラフィック）
+                        if val_str.lower() not in ['-nan', 'nan']:
+                            try:
+                                val = float(val_str)
+                                if not math.isnan(val):
+                                    return val
+                            except ValueError:
+                                continue
             
             return None
             
@@ -527,9 +519,18 @@ class TopologyVisualizer:
         self.ax = None
         self.pos = None
         
+        # 経過時間追跡用
+        self.start_time = time.time()
+        self.elapsed_minutes = 0
+        
+        # 履歴保存用ディレクトリ（設定変数から参照）
+        self.history_dir = os.path.join(output_dir, HISTORY_SAVE_DIR)
+        
         # 出力ディレクトリの作成
         os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.history_dir, exist_ok=True)
         logger.info(f"可視化出力ディレクトリ: {self.output_dir}")
+        logger.info(f"履歴保存ディレクトリ: {self.history_dir}")
         
         self._setup_figure()
     
@@ -562,7 +563,7 @@ class TopologyVisualizer:
         nx.draw_networkx_nodes(
             self.graph, self.pos, 
             node_color='lightblue', 
-            node_size=800, 
+            node_size=1000, 
             ax=self.ax
         )
         
@@ -570,7 +571,7 @@ class TopologyVisualizer:
         nx.draw_networkx_labels(
             self.graph, self.pos, 
             labels={node: f'r{node}' for node in self.graph.nodes()},
-            font_size=10,
+            font_size=12,
             font_weight='bold',
             ax=self.ax
         )
@@ -594,7 +595,7 @@ class TopologyVisualizer:
         nx.draw_networkx_edge_labels(
             self.graph, self.pos,
             edge_labels=edge_labels,
-            font_size=8,
+            font_size=10,
             ax=self.ax
         )
         
@@ -633,17 +634,33 @@ class TopologyVisualizer:
         
         # タイトルと凡例
         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 経過時間の計算（分単位）
+        self.elapsed_minutes = int((time.time() - self.start_time) / 60)
+        
+        # 経過時間を図の上部に表示
+        elapsed_text = f"Elapsed: {self.elapsed_minutes} minute{'s' if self.elapsed_minutes != 1 else ''}"
+        self.ax.text(0.5, 1.08, elapsed_text, transform=self.ax.transAxes,
+                    fontsize=18, fontweight='bold', ha='center', va='bottom',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+        
         self.ax.set_title(f'SRv6 Network Topology and Path Selection\n(Update Count: {update_count}, Time: {timestamp})', 
-                         fontsize=14, fontweight='bold')
+                         fontsize=16, fontweight='bold')
         if paths:
-            self.ax.legend(loc='upper left', fontsize=9)
+            self.ax.legend(loc='upper left', fontsize=11)
         
         self.ax.axis('off')
         plt.tight_layout()
         
-        # 画像ファイルとして保存（最新版のみ）
+        # 画像ファイルとして保存（最新版）
         latest_path = os.path.join(self.output_dir, 'topology_latest.png')
         plt.savefig(latest_path, dpi=150, bbox_inches='tight')
+        
+        # 履歴保存（経過時間付きファイル名）
+        history_filename = f"{self.elapsed_minutes}_minutes.png"
+        history_path = os.path.join(self.history_dir, history_filename)
+        plt.savefig(history_path, dpi=150, bbox_inches='tight')
+        logger.info(f"履歴画像保存: {history_path}")
     
     def close(self):
         """図を閉じる"""
@@ -1104,11 +1121,22 @@ def main():
             else:
                 # 双方向リアルタイム監視
                 logger.info(f"双方向リアルタイム監視開始（間隔: {args.interval}秒）")
+                logger.info(f"測定停止時間: {MEASUREMENT_DURATION_MINUTES}分")
                 if args.visualize:
                     logger.info("トポロジ可視化: 有効（画像ファイルとして保存）")
+                    logger.info(f"履歴保存先: visualization/{HISTORY_SAVE_DIR}/")
+                
+                # 測定開始時刻を記録
+                measurement_start_time = time.time()
                 
                 try:
                     while True:
+                        # 経過時間チェック（分単位）
+                        total_elapsed_minutes = (time.time() - measurement_start_time) / 60
+                        if total_elapsed_minutes >= MEASUREMENT_DURATION_MINUTES:
+                            logger.info(f"⏱️ 測定時間 {MEASUREMENT_DURATION_MINUTES}分が経過しました。測定を終了します。")
+                            break
+                        
                         start_time = time.time()
                         success = manager.update_bidirectional_tables()
                         if success:
@@ -1116,12 +1144,20 @@ def main():
                         else:
                             logger.error("❌ 双方向テーブル更新失敗")
                         
+                        # 残り時間を表示
+                        remaining_minutes = MEASUREMENT_DURATION_MINUTES - total_elapsed_minutes
+                        logger.info(f"⏱️ 経過: {total_elapsed_minutes:.1f}分 / 残り: {remaining_minutes:.1f}分")
+                        
                         # 次回更新まで待機
                         elapsed = time.time() - start_time
                         sleep_time = max(0, args.interval - elapsed)
                         logger.info(f"次回更新まで {sleep_time:.1f} 秒待機... (処理時間: {elapsed:.1f}秒)")
                         logger.info("=" * 80)
                         time.sleep(sleep_time)
+                    
+                    # 正常終了時のクリーンアップ
+                    logger.info("✅ 測定完了")
+                    manager.cleanup()
                         
                 except KeyboardInterrupt:
                     logger.info("監視を停止します")

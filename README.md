@@ -1,185 +1,159 @@
-# SRv6 Dynamic Routing Performance Evaluation System
+# SRv6 動的経路制御 性能評価システム
 
-A comprehensive Docker-based SRv6 (Segment Routing over IPv6) dynamic routing system designed for **performance evaluation research**. Features a 16-router mesh topology with real-time traffic monitoring, multi-table routing, and automatic path orchestration capabilities.
+Docker ベースの SRv6（Segment Routing over IPv6）動的経路制御システムです。**性能評価研究**を目的として設計されており、16台のルータによるメッシュトポロジ、リアルタイムトラフィック監視、マルチテーブルルーティング、自動経路オーケストレーション機能を備えています。
 
-## 🌟 Key Features
+## 🌟 主な機能
 
-- **🚀 Dynamic Path Orchestration**: Real-time optimal path calculation based on network conditions
-- **🔄 Bidirectional Control**: Independent forward (r1→r16) and return (r16→r1) path management with synchronized flow label handling
-- **📊 Multi-Table Routing**: QoS-aware routing with 3 priority tiers (high/medium/low) using fwmark-based classification
-- **⚡ Real-time Monitoring**: MRTG-based traffic analysis with 60-second RRD data polling across 27 monitored links
-- **🧠 Intelligent Switching**: Automatic path switching based on link utilization thresholds
-- **🔧 Auto-Configuration**: Automated Phase 1 & 2 setup on container startup (nftables + routing tables + fwmark rules)
-- **📈 Performance Analytics**: RRD-based edge weight calculation and NetworkX shortest path optimization
-- **🐳 Full Containerization**: Complete Docker-based deployment with 16 routers + controller
-- **🌐 External Node Support**: Macvlan-based connection for real-world UPF/Server integration
-- **⚡ 1Gbps Bandwidth Control**: HTB-based traffic shaping with optimized burst settings on all router interfaces
-- **✅ Verified Flow Label Mapping**: 0xfffc4 → mark 4, 0xfffc6 → mark 6, default → mark 9 across r1/r16
+- **🚀 動的経路オーケストレーション**: ネットワーク状況に基づくリアルタイム最適経路計算
+- **🔄 双方向制御**: 往路（r1→r16）と復路（r16→r1）の独立した経路管理、同期フローラベル処理
+- **📊 マルチテーブルルーティング**: fwmarkベースの分類による3段階QoS対応ルーティング（高/中/低優先度）
+- **⚡ リアルタイム監視**: MRTGベースのトラフィック分析、60秒間隔のRRDデータ収集（24リンク監視）
+- **🧠 インテリジェント切り替え**: リンク利用率閾値に基づく自動経路切り替え
+- **🔧 自動設定**: コンテナ起動時のPhase 1 & 2自動セットアップ（nftables + ルーティングテーブル + fwmarkルール）
+- **📈 性能分析**: RRDベースのエッジ重み計算とNetworkX最短経路最適化
+- **🖼️ トポロジ可視化**: ネットワーク状態と選択経路のリアルタイム可視化機能
+- **🐳 完全コンテナ化**: 16台のルータ + コントローラのDocker ベースデプロイメント
+- **🌐 外部ノード接続対応**: Macvlanによる実機UPF/サーバー統合
+- **⚡ 1Gbps帯域制御**: 全ルータインターフェースにHTBベースのトラフィックシェーピング
 
-## 📅 Last Updated
-- **2025-12-01**: Added 1Gbps bandwidth limiting with HTB (burst 15k optimization for high throughput)
-- **2025-11-04**: Fixed flow label → mark mapping verification
+## 📅 最終更新
+- **2025-12-11**: README日本語化、可視化機能の強化
+- **2025-12-01**: HTBによる1Gbps帯域制限追加（高スループット向けburst 15k最適化）
+- **2025-11-04**: フローラベル→マーク マッピング検証完了
 
-## 🏗️ System Architecture
+## 🏗️ システムアーキテクチャ
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│                 SRv6 Dynamic Routing Performance Evaluation System               │
+│                 SRv6 動的経路制御 性能評価システム                                 │
 │                                                                                  │
-│  16-Router Mesh Topology (4x4 Grid)                                              │
+│  16台ルータ メッシュトポロジ (4x4 グリッド)                                        │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐ │
 │  │                                                                             │ │
 │  │   UPF ─── r1 ─── r2 ─── r4 ─── r7 ───┐                                     │ │
-│  │  (ext)     │      │      │      │     │                                     │ │
+│  │  (外部)    │      │      │      │     │                                     │ │
 │  │            │      │      │      │     │                                     │ │
 │  │            r3 ─── r5 ─── r8 ─── r11 ──┼─── r14 ──┐                          │ │
 │  │            │      │      │      │     │          │                          │ │
 │  │            │      │      │      │     │          │                          │ │
 │  │            r6 ─── r9 ─── r12 ───┼─────┘          r16 ─── Server             │ │
-│  │            │      │      │      │                │       (ext)              │ │
+│  │            │      │      │      │                │       (外部)              │ │
 │  │            │      │      │      │                │                          │ │
 │  │            r10 ── r13 ── r15 ───┴──────────────────┘                         │ │
 │  │                                                                             │ │
-│  │  All Links: 1Gbps bandwidth limit (HTB, burst 15k)                          │ │
-│  │  Monitoring: 27 links with RRD data collection (60s intervals)              │ │
+│  │  全リンク: 1Gbps帯域制限 (HTB, burst 15k)                                    │ │
+│  │  監視: 24リンク RRDデータ収集 (60秒間隔)                                      │ │
 │  └─────────────────────────────────────────────────────────────────────────────┘ │
 │                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────┐  │
-│  │                    Controller System (fd02:1::20)                          │  │
+│  │                    コントローラシステム (fd02:1::20)                        │  │
 │  │  ┌──────────────────┐  ┌──────────────────────────────────────────────┐   │  │
-│  │  │ Auto Init        │  │    Real-time Components                       │   │  │
-│  │  │ (on startup)     │  │  ┌────────────┐  ┌──────────────────────────┐│   │  │
-│  │  │ ┌──────────────┐ │  │  │ MRTG       │  │ Phase3 RT Manager        ││   │  │
-│  │  │ │ Phase1       │ │  │  │ Poller     │  │ - Bidirectional Control  ││   │  │
-│  │  │ │ - r1 tables  │ │  │  │ (60s)      │  │ - Multi-table Management ││   │  │
-│  │  │ │ - r16 tables │◄┼──┼──┤ 27 Links   │◄─┤ - Dynamic Path Switching ││   │  │
-│  │  │ │ - fwmark→tbl │ │  │  │ RRD Data   │  │ - SRv6 Route Updates     ││   │  │
+│  │  │ 自動初期化        │  │    リアルタイムコンポーネント                    │   │  │
+│  │  │ (起動時)          │  │  ┌────────────┐  ┌──────────────────────────┐│   │  │
+│  │  │ ┌──────────────┐ │  │  │ MRTG       │  │ Phase3 RTマネージャ       ││   │  │
+│  │  │ │ Phase1       │ │  │  │ Poller     │  │ - 双方向制御              ││   │  │
+│  │  │ │ - r1テーブル  │ │  │  │ (60秒)     │  │ - マルチテーブル管理       ││   │  │
+│  │  │ │ - r16テーブル│◄┼──┼──┤ 24リンク   │◄─┤ - 動的経路切り替え        ││   │  │
+│  │  │ │ - fwmark→tbl │ │  │  │ RRDデータ  │  │ - SRv6ルート更新          ││   │  │
 │  │  │ └──────────────┘ │  │  └────────────┘  └──────────────────────────┘│   │  │
 │  │  │ ┌──────────────┐ │  │                                               │   │  │
-│  │  │ │ Phase2       │ │  │   Flow Label → Mark Mapping:                  │   │  │
-│  │  │ │ - r1 nftables│ │  │   0xfffc4 → mark 4 → rt_table1 (High)        │   │  │
-│  │  │ │ - r16 nftables│ │ │   0xfffc6 → mark 6 → rt_table2 (Medium)      │   │  │
-│  │  │ │ - flowlabel  │ │  │   default → mark 9 → rt_table3 (Low)         │   │  │
+│  │  │ │ Phase2       │ │  │   フローラベル → マーク マッピング:             │   │  │
+│  │  │ │ - r1 nftables│ │  │   0xfffc4 → mark 4 → rt_table1 (高優先度)     │   │  │
+│  │  │ │ - r16 nftables│ │ │   0xfffc6 → mark 6 → rt_table2 (中優先度)     │   │  │
+│  │  │ │ - flowlabel  │ │  │   デフォルト → mark 9 → rt_table3 (低優先度)  │   │  │
 │  │  │ │   →mark(4/6/9)│ │  │                                               │   │  │
 │  │  │ └──────────────┘ │  └──────────────────────────────────────────────┘   │  │
 │  │  └──────────────────┘                                                      │  │
 │  └────────────────────────────────────────────────────────────────────────────┘  │
-│           │ SSH Auto-Config              │ RT Updates                            │
-│           ▼                              ▼                                       │
-│  ┌─────────────────┐           ┌─────────────────┐                               │
-│  │ r1 (Ingress)    │           │ r16 (Egress)    │                               │
-│  │ fd02:1::2       │           │ fd02:1::11      │                               │
-│  │ ┌─────────────┐ │           │ ┌─────────────┐ │                               │
-│  │  │ nftables    │ │           │ │ nftables    │ │                               │
-│  │  │ flowlabel→  │ │           │ │ flowlabel→  │ │                               │
-│  │  │ mark 4/6/9  │ │           │ │ mark 4/6/9  │ │                               │
-│  │  └─────────────┘ │           │ └─────────────┘ │                               │
-│  │ ┌─────────────┐ │           │ ┌─────────────┐ │                               │
-│  │ │ rt_table1/2/3│ │          │ │ rt_table_1/2/3│ │                              │
-│  │ │ (Priority)  │ │           │ │ (Priority)  │ │                               │
-│  │ │ fwmark 4/6/9│ │           │ │ fwmark 4/6/9│ │                               │
-│  │ │ → SRv6 routes│ │          │ │ → SRv6 routes│ │                               │
-│  │ └─────────────┘ │           │ └─────────────┘ │                               │
-│  └─────────────────┘           └─────────────────┘                               │
 └──────────────────────────────────────────────────────────────────────────────────┘
-
-Bandwidth Control:
-├── All router interfaces: 1Gbps HTB limit (burst 15k, cburst 15k)
-├── Optimized for high-throughput testing
-└── Automatic configuration on container startup
 ```
 
-## 📁 Project Structure
+## 📁 プロジェクト構成
 
 ```
 srv6_dynamic_routing_performance_evaluation_system/
-├── 📋 README.md                           # Project documentation
-├── 🐳 docker-compose.yml                  # 16-router topology configuration
-├── 📖 EXTERNAL_CONNECTION.md              # External UPF/Server connection guide
+├── 📋 README.md                           # プロジェクトドキュメント
+├── 🐳 docker-compose.yml                  # 16台ルータトポロジ設定
+├── 📖 EXTERNAL_CONNECTION.md              # 外部UPF/サーバー接続ガイド
 │
-├── 🌐 router/                             # SRv6 router infrastructure
-│   ├── Dockerfile                        # Base router image (r2-r15)
-│   ├── Dockerfile_r1                     # R1 (ingress) with SSH + nftables
-│   ├── Dockerfile_r16                    # R16 (egress) with SSH + nftables
-│   ├── scripts/                          # Router initialization
-│   │   ├── srv6_setup.sh                 # SRv6 kernel configuration
-│   │   ├── set_bandwidth_limit.sh        # 1Gbps HTB bandwidth control
-│   │   ├── r1_startup.sh                 # R1 specialized startup
-│   │   └── r16_startup.sh                # R16 specialized startup
-│   ├── docs/                             # Technical documentation
-│   │   ├── advanced-routing-setup.md     # nftables + fwmark guide
-│   │   └── srv6-end-functions.md         # SRv6 function reference
+├── 🌐 router/                             # SRv6ルータインフラ
+│   ├── Dockerfile                        # 基本ルータイメージ (r2-r15)
+│   ├── Dockerfile_r1                     # R1 (イングレス) SSH + nftables対応
+│   ├── Dockerfile_r16                    # R16 (イーグレス) SSH + nftables対応
+│   ├── scripts/                          # ルータ初期化スクリプト
+│   │   ├── srv6_setup.sh                 # SRv6カーネル設定
+│   │   ├── set_bandwidth_limit.sh        # 1Gbps HTB帯域制御
+│   │   ├── r1_startup.sh                 # R1専用起動スクリプト
+│   │   └── r16_startup.sh                # R16専用起動スクリプト
+│   ├── docs/                             # 技術ドキュメント
+│   │   ├── advanced-routing-setup.md     # nftables + fwmarkガイド
+│   │   └── srv6-end-functions.md         # SRv6関数リファレンス
 │   └── snmpd/
-│       └── snmpd.conf                    # SNMP monitoring config
+│       └── snmpd.conf                    # SNMP監視設定
 │
-└── 🎛️ controller/                         # Control plane system
-    ├── Dockerfile                        # Auto-initializing controller
-    ├── init_setup.py                     # Automated Phase1&2 setup
+└── 🎛️ controller/                         # 制御プレーンシステム
+    ├── Dockerfile                        # 自動初期化対応コントローラ
+    ├── init_setup.py                     # 自動Phase1&2セットアップ
     │
-    ├── 📊 mrtg/                          # Traffic monitoring
-    │   ├── mrtg_kurage.conf              # Link-specific MRTG config
-    │   ├── mrtg_kurage.ok                # Status indicator
-    │   ├── mrtg_file/                    # RRD data storage (27 link files)
-    │   │   ├── r1-r2.rrd, r1-r3.rrd      # Edge router links
-    │   │   ├── r2-r4.rrd ... r15-r16.rrd # Mesh network links
-    │   │   └── (27 total RRD files)
+    ├── 📊 mrtg/                          # トラフィック監視
+    │   ├── mrtg_kurage.conf              # リンク別MRTG設定
+    │   ├── mrtg_file/                    # RRDデータストレージ (24リンクファイル)
     │   └── rrdtool_shell/
-    │       └── create_rrd.sh             # RRD database initialization
+    │       └── create_rrd.sh             # RRDデータベース初期化
     │
-    ├── 📊 presentation/                   # Research presentation materials
-    │   ├── README.md                     # Presentation guide
-    │   ├── diagrams/                     # System architecture diagrams
-    │   ├── docs/                         # Documentation exports
-    │   └── scripts/                      # Diagram generation scripts
+    ├── 📊 presentation/                   # 研究発表資料
+    │   ├── README.md                     # プレゼンテーションガイド
+    │   ├── diagrams/                     # システムアーキテクチャ図
+    │   └── scripts/                      # ダイアグラム生成スクリプト
     │
-    └── 🎯 srv6-path-orchestrator/         # Core orchestration system
-        ├── function_analysis.md          # System function analysis
-        ├── VISUALIZATION_README.md       # Visualization guide
+    └── 🎯 srv6-path-orchestrator/         # コアオーケストレーションシステム
+        ├── function_analysis.md          # システム機能分析
+        ├── VISUALIZATION_README.md       # 可視化ガイド
         │
-        ├── 🔧 Phase 1&2 Setup Scripts (Auto-executed):
-        ├── r1_phase1_table_setup.py      # R1 routing tables + rules
-        ├── r1_phase2_nftables_setup.py   # R1 nftables + flow marking
-        ├── r16_phase1_table_setup.py     # R16 routing tables + rules  
-        ├── r16_phase2_nftables_setup.py  # R16 nftables + flow marking
+        ├── 🔧 Phase 1&2 セットアップスクリプト (自動実行):
+        ├── r1_phase1_table_setup.py      # R1ルーティングテーブル + ルール
+        ├── r1_phase2_nftables_setup.py   # R1 nftables + フローマーキング
+        ├── r16_phase1_table_setup.py     # R16ルーティングテーブル + ルール
+        ├── r16_phase2_nftables_setup.py  # R16 nftables + フローマーキング
         │
-        └── 🚀 Phase 3 Main System:
-            └── phase3_realtime_multi_table.py # Main orchestrator
-                                               # - Bidirectional control
-                                               # - Real-time monitoring  
-                                               # - Dynamic path switching
-                                               # - Multi-table management
+        └── 🚀 Phase 3 メインシステム:
+            └── phase3_realtime_multi_table.py # メインオーケストレータ
+                                               # - 双方向制御
+                                               # - リアルタイム監視
+                                               # - 動的経路切り替え
+                                               # - マルチテーブル管理
+                                               # - トポロジ可視化
 ```
 
-## 🚀 Quick Start
+## 🚀 クイックスタート
 
-### Prerequisites
-- Docker and Docker Compose v2.0+
-- Linux environment with IPv6 support (tested on Ubuntu 22.04+)
-- Root privileges for container networking
-- Physical NIC for external connections (optional, for UPF/Server integration)
+### 前提条件
+- Docker および Docker Compose v2.0以上
+- IPv6対応のLinux環境（Ubuntu 22.04以上で動作確認済み）
+- コンテナネットワーキングのためのroot権限
+- 外部接続用の物理NIC（オプション、UPF/サーバー統合用）
 
-
-### 1. Clone and Deploy
+### 1. クローンとデプロイ
 ```bash
 git clone https://github.com/hiro-hcu/srv6_dynamic_routing_performance_evaluation_system.git
 cd srv6_dynamic_routing_performance_evaluation_system
 
-# Deploy all containers with automatic initialization
+# 自動初期化付きで全コンテナをデプロイ
 sudo docker compose up -d
 
-# For fresh rebuild (recommended after updates)
+# 完全再ビルド（更新後推奨）
 sudo docker compose down && sudo docker compose build --no-cache && sudo docker compose up -d
 ```
 
-### 2. Verify System Status
+### 2. システム状態の確認
 ```bash
-# Check all 17 containers are running (16 routers + 1 controller)
+# 17コンテナが起動中であることを確認（16ルータ + 1コントローラ）
 sudo docker ps
 
-# Monitor initialization progress
+# 初期化の進捗を監視
 sudo docker logs -f controller
 
-# Expected output:
+# 期待される出力:
 # INFO - SRv6システム初期化開始...
 # INFO - ✅ SSH準備完了 (r1: fd02:1::2, r16: fd02:1::11)
 # INFO - ✅ r1_phase1_table_setup.py 実行成功
@@ -189,204 +163,204 @@ sudo docker logs -f controller
 # INFO - 🎉 初期化完了: システムは運用可能です
 ```
 
-### 3. Verify Bandwidth Control
+### 3. 帯域制御の確認
 ```bash
-# Check HTB settings on any router (should show burst 15k)
+# 任意のルータでHTB設定を確認（burst 15kが表示されるはず）
 sudo docker exec r1 tc class show dev eth0
 
-# Expected output:
+# 期待される出力:
 # class htb 1:10 root prio 0 rate 1Gbit ceil 1Gbit burst 15125b cburst 15125b
 ```
 
-### 4. Verification Commands
+### 4. 設定検証コマンド
 ```bash
-# Verify nftables configuration (r1)
+# nftables設定の確認 (r1)
 sudo docker exec -it r1 nft list table ip6 mangle
-# Expected: flowlabel 0xfffc4 → mark 4, 0xfffc6 → mark 6
+# 期待: flowlabel 0xfffc4 → mark 4, 0xfffc6 → mark 6
 
-# Verify routing rules (r16)
+# ルーティングルールの確認 (r16)
 sudo docker exec -it r16 ip -6 rule list
-# Expected: fwmark 0x4/0x6/0x9 lookup rt_table_1/2/3
+# 期待: fwmark 0x4/0x6/0x9 lookup rt_table_1/2/3
 
-# Check routing tables
+# ルーティングテーブルの確認
 sudo docker exec -it r1 ip -6 route show table rt_table1
 sudo docker exec -it r16 ip -6 route show table rt_table_1
 ```
 
-### 5. Start Real-time Orchestration (Phase 3)
+### 5. リアルタイムオーケストレーション開始 (Phase 3)
 ```bash
-# Run bidirectional real-time management (continuous mode)
+# 双方向リアルタイム管理（継続モード）
 sudo docker exec -it controller python3 /opt/app/srv6-path-orchestrator/phase3_realtime_multi_table.py
 
-# Alternative: One-time execution for testing
+# 可視化機能付きで実行
+sudo docker exec -it controller bash -c "cd /opt/app/srv6-path-orchestrator && python3 phase3_realtime_multi_table.py --mode bidirectional --visualize"
+
+# テスト用の単発実行
 sudo docker exec -it controller python3 /opt/app/srv6-path-orchestrator/phase3_realtime_multi_table.py --once
 
-# Expected output:
+# 期待される出力:
 # INFO - 🚀 双方向テーブル更新開始
-# INFO - Edge r1 <-> r2: 9.633 bps
+# INFO - Edge r1 <-> r2: 9.633 Mbps (利用率: 0.0154)
 # INFO - 往路最適経路: r1 → r2 → r4 → r7 → r11 → r14 → r16
 # INFO - 復路最適経路: r16 → r14 → r11 → r7 → r4 → r2 → r1
 # INFO - ✅ 双方向テーブル更新成功
 ```
 
-## 🌐 External PC Connection (Advanced)
+## 🌐 外部PC接続（高度な使用法）
 
-For real-world testing with physical UPF/Server nodes:
+実機UPF/サーバーノードとの実環境テスト用:
 
-### System Modes
-- **Container Mode**: Self-contained testing environment (default)
-- **External Node Mode**: Macvlan-based connection to real hardware
+### システムモード
+- **コンテナモード**: 自己完結型テスト環境（デフォルト）
+- **外部ノードモード**: Macvlanによる実機接続
 
-### External PC Setup
+### 外部PC設定
 ```bash
-# External networks are pre-configured in docker-compose.yml:
-# - external-upf: fd00:1::/64 (via enp2s0f1 macvlan)
-# - external-server: fd03:1::/64 (via enp2s0f0 macvlan)
+# 外部ネットワークはdocker-compose.ymlで事前設定済み:
+# - external-upf: fd00:1::/64 (enp2s0f1経由macvlan)
+# - external-server: fd03:1::/64 (enp2s0f0経由macvlan)
 
-# UPF PC configuration:
+# UPF PC設定:
 sudo ip -6 addr add fd00:1::1/64 dev <interface>
-sudo ip -6 route add fd03:1::/64 via fd00:1::12  # via r1
+sudo ip -6 route add fd03:1::/64 via fd00:1::12  # r1経由
 
-# Server PC configuration:
+# サーバーPC設定:
 sudo ip -6 addr add fd03:1::2/64 dev <interface>
-sudo ip -6 route add fd00:1::/64 via fd03:1::11  # via r16
+sudo ip -6 route add fd00:1::/64 via fd03:1::11  # r16経由
 ```
 
-📖 **Detailed Guide**: See [EXTERNAL_CONNECTION.md](EXTERNAL_CONNECTION.md) for complete setup instructions.
+📖 **詳細ガイド**: [EXTERNAL_CONNECTION.md](EXTERNAL_CONNECTION.md) を参照してください。
 
 ---
 
-## ⚡ Performance Optimization
+## ⚡ 性能最適化
 
-### Bandwidth Control (HTB)
-All router interfaces are automatically configured with 1Gbps bandwidth limits:
+### 帯域制御 (HTB)
+全ルータインターフェースは自動的に1Gbps帯域制限で設定されます:
 
 ```bash
-# Applied settings (set_bandwidth_limit.sh):
+# 適用される設定 (set_bandwidth_limit.sh):
 tc qdisc add dev $iface root handle 1: htb default 10
 tc class add dev $iface parent 1: classid 1:10 htb rate 1000mbit ceil 1000mbit burst 15k cburst 15k
 ```
 
-### Host-Level Optimizations (Recommended)
-For maximum throughput testing, apply these host optimizations:
+### ホストレベル最適化（推奨）
+最大スループットテスト向けに、以下のホスト最適化を適用:
 
 ```bash
-# Expand NIC ring buffers (if supported)
+# NICリングバッファの拡張（サポートされている場合）
 sudo ethtool -G enp2s0f0 rx 8192 tx 8192
 sudo ethtool -G enp2s0f1 rx 8192 tx 8192
 
-# Increase kernel socket buffers
+# カーネルソケットバッファの増加
 sudo sysctl -w net.core.rmem_max=16777216
 sudo sysctl -w net.core.wmem_max=16777216
 sudo sysctl -w net.core.netdev_max_backlog=30000
 
-# Verify settings
-tc class show dev eth0  # Should show burst 15125b
+# 設定確認
+tc class show dev eth0  # burst 15125b が表示されるはず
 ```
 
-## 🎯 System Phases Overview
+## 🎯 システムフェーズ概要
 
-### Phase 1: Infrastructure Setup (Auto-executed)
-- **Routing Tables**: Creates `rt_table1`, `rt_table2`, `rt_table3` for QoS tiers
-- **Rule Configuration**: Sets up `fwmark`-based routing rules
-- **Targets**: Both r1 (ingress) and r16 (egress) routers
+### Phase 1: インフラセットアップ（自動実行）
+- **ルーティングテーブル**: QoS階層用に `rt_table1`, `rt_table2`, `rt_table3` を作成
+- **ルール設定**: `fwmark` ベースのルーティングルールを設定
+- **対象**: r1（イングレス）とr16（イーグレス）両ルータ
 
-### Phase 2: Traffic Classification (Auto-executed)  
-- **nftables Setup**: IPv6 flow label → firewall mark conversion
-- **Flow Mapping**: 
-  - `0xfffc4` (1048516) → mark **4** → High Priority (rt_table1)
-  - `0xfffc6` (1048518) → mark **6** → Medium Priority (rt_table2) 
-  - デフォルト（上記以外） → mark **9** → Low Priority (rt_table3)
-- **Bidirectional**: Independent forward (r1) and return (r16) classification
-- **Automatic**: Executes during container startup via `init_setup.py`
+### Phase 2: トラフィック分類（自動実行）
+- **nftables設定**: IPv6フローラベル → ファイアウォールマーク変換
+- **フローマッピング**:
+  - `0xfffc4` (1048516) → mark **4** → 高優先度 (rt_table1)
+  - `0xfffc6` (1048518) → mark **6** → 中優先度 (rt_table2)
+  - デフォルト（上記以外） → mark **9** → 低優先度 (rt_table3)
+- **双方向**: 往路（r1）と復路（r16）の独立した分類
+- **自動**: `init_setup.py` によりコンテナ起動時に実行
 
-### Phase 3: Real-time Orchestration (Manual/Automated)
-- **Traffic Monitoring**: RRD-based link utilization analysis (60-second intervals, 27 monitored links)
-- **Dynamic Paths**: Automatic optimal path calculation using NetworkX shortest path
-- **Bidirectional Control**: Simultaneous r1→r16 (forward) and r16→r1 (return) path management
-- **SRv6 Encapsulation**: Dynamic SID list generation based on calculated paths
-- **Route Updates**: SSH-based automated route installation to r1 and r16
-- **Multi-Table**: 3-priority system with independent path optimization per table
+### Phase 3: リアルタイムオーケストレーション（手動/自動）
+- **トラフィック監視**: RRDベースのリンク利用率分析（60秒間隔、24リンク監視）
+- **動的経路**: NetworkX Dijkstra最短経路による自動最適経路計算
+- **双方向制御**: r1→r16（往路）とr16→r1（復路）の同時経路管理
+- **SRv6カプセル化**: 計算された経路に基づく動的SIDリスト生成
+- **ルート更新**: SSHによる自動ルートインストール（paramiko使用）
+- **マルチテーブル**: テーブルごとの独立した経路最適化による3段階優先度システム
+- **可視化**: ネットワークトポロジと選択経路のリアルタイム画像出力
 
-## 📊 Technical Implementation
+## 📊 技術実装
 
-### nftables + fwmark Integration
+### nftables + fwmark 統合
 ```bash
-# Phase 2: Flow Label Detection (nftables)
-# Creates mangle table and sets marks based on IPv6 flow labels
+# Phase 2: フローラベル検出 (nftables)
+# mangleテーブルを作成し、IPv6フローラベルに基づいてマークを設定
 nft 'add table ip6 mangle'
 nft 'add chain ip6 mangle prerouting { type filter hook prerouting priority mangle; }'
 nft 'add rule ip6 mangle prerouting ip6 flowlabel 0xfffc4 mark set 0x4'  # 高優先度
 nft 'add rule ip6 mangle prerouting ip6 flowlabel 0xfffc6 mark set 0x6'  # 中優先度
 nft 'add rule ip6 mangle prerouting mark set 0x9'                        # デフォルト（低優先度）
 
-# Phase 1: Routing Rule Application (fwmark-based table selection)
-ip -6 rule add pref 1000 fwmark 0x4 table rt_table1  # High priority
-ip -6 rule add pref 1001 fwmark 0x6 table rt_table2  # Medium priority
-ip -6 rule add pref 1002 fwmark 0x9 table rt_table3  # Low priority (default)
+# Phase 1: ルーティングルール適用 (fwmarkベースのテーブル選択)
+ip -6 rule add pref 1000 fwmark 0x4 table rt_table1  # 高優先度
+ip -6 rule add pref 1001 fwmark 0x6 table rt_table2  # 中優先度
+ip -6 rule add pref 1002 fwmark 0x9 table rt_table3  # 低優先度（デフォルト）
 
-# Phase 3: SRv6 Route Installation (dynamic, per-table)
-# Example: Forward path r1→r2→r4→r6 in rt_table1
+# Phase 3: SRv6ルートインストール（動的、テーブル別）
+# 例: rt_table1での往路 r1→r2→r4→r7→r11→r14→r16
 ip -6 route add fd03:1::/64 encap seg6 mode encap \
-    segs fd01:2::12,fd01:3::12,fd01:4::12 dev eth1 table rt_table1
-
-# Example: Return path r6→r4→r2→r1 in rt_table_1
-ip -6 route add fd00:1::/64 encap seg6 mode encap \
-    segs fd01:4::11,fd01:3::11,fd01:2::11 dev eth2 table rt_table_1
+    segs fd01:1::12,fd01:2::12,fd01:3::12,fd01:8::12,fd01:9::12,fd01:a::12 dev eth1 table rt_table1
 ```
 
-### Flow Label → Mark → Table Flow
+### フローラベル → マーク → テーブル フロー
 ```
-User Packet with flowlabel 0xfffc4 (high priority)
+flowlabel 0xfffc4 (高優先度) を持つユーザーパケット
     ↓
 [nftables mangle prerouting]
-    ↓ (flowlabel 0xfffc4 detected)
-Packet marked with fwmark=4
+    ↓ (flowlabel 0xfffc4 検出)
+パケットに fwmark=4 を付与
     ↓
 [ip -6 rule lookup]
-    ↓ (fwmark 4 matches)
-Routing table rt_table1 selected
+    ↓ (fwmark 4 がマッチ)
+ルーティングテーブル rt_table1 を選択
     ↓
-[SRv6 encapsulation route in rt_table1]
+[rt_table1 の SRv6 カプセル化ルート]
     ↓
-Packet encapsulated with SID list for optimal path
+最適経路用のSIDリストでパケットをカプセル化
     ↓
-Forwarded to next hop
+次ホップへ転送
 ```
 
-### Real-time Monitoring Pipeline
-- **MRTG**: 60-second SNMP polling → RRD storage (27 links)
-- **Phase3 Manager**: RRD fetch → Traffic analysis → Graph edge weight update
-- **Path Calculator**: NetworkX Dijkstra shortest path → Multiple path options
-- **Route Installer**: SSH automation (paramiko) → Live route updates to r1/r16
-- **Bidirectional**: Independent optimization for forward and return paths
+### リアルタイム監視パイプライン
+- **MRTG**: 60秒間隔のSNMPポーリング → RRDストレージ（24リンク）
+- **Phase3マネージャ**: RRDフェッチ → トラフィック分析 → グラフエッジ重み更新
+- **経路計算**: NetworkX Dijkstra最短経路 → 複数経路オプション
+- **ルートインストーラ**: SSHオートメーション（paramiko） → r1/r16へのライブルート更新
+- **双方向**: 往路と復路の独立した最適化
 
-## 🔗 Network Topology & Addressing
+## 🔗 ネットワークトポロジとアドレッシング
 
-### 16-Router Mesh Topology
+### 16台ルータ メッシュトポロジ
 ```
-Layer 1 (Edge):     r1 ─────────────────────────────────────── r16
-                    │                                           │
-Layer 2:            r2 ─── r3                             r14 ── r15
-                    │       │                              │      │
-Layer 3:            r4 ─── r5 ─── r6                 r11 ── r12 ── r13
-                    │       │      │                  │      │      │
-Layer 4:            r7 ─── r8 ─── r9 ─── r10 ────────┴──────┴──────┘
+レイヤー1 (エッジ):     r1 ─────────────────────────────────────── r16
+                       │                                           │
+レイヤー2:             r2 ─── r3                             r14 ── r15
+                       │       │                              │      │
+レイヤー3:             r4 ─── r5 ─── r6                 r11 ── r12 ── r13
+                       │       │      │                  │      │      │
+レイヤー4:             r7 ─── r8 ─── r9 ─── r10 ────────┴──────┴──────┘
 
-Monitored Links (27 total with RRD data):
-├── r1-r2, r1-r3 (edge ingress)
+監視リンク (24本、RRDデータあり):
+├── r1-r2, r1-r3 (エッジイングレス)
 ├── r2-r4, r2-r5, r3-r5, r3-r6, r4-r7, r4-r8, r5-r8, r5-r9
 ├── r6-r9, r6-r10, r7-r11, r8-r11, r8-r12, r9-r12, r9-r13
 ├── r10-r13, r11-r14, r12-r14, r12-r15, r13-r15
-└── r14-r16, r15-r16 (edge egress)
+└── r14-r16, r15-r16 (エッジイーグレス)
 ```
 
-### IP Addressing Scheme
+### IPアドレス体系
 ```
-Management Network (SSH & Control):
-├── Controller: fd02:1::20
-├── r1:  fd02:1::2  (SSH enabled, ingress)
-├── r2:  fd02:1::3  
+管理ネットワーク (SSH & 制御):
+├── コントローラ: fd02:1::20
+├── r1:  fd02:1::2  (SSH有効、イングレス)
+├── r2:  fd02:1::3
 ├── r3:  fd02:1::4
 ├── r4:  fd02:1::5
 ├── r5:  fd02:1::6
@@ -400,230 +374,244 @@ Management Network (SSH & Control):
 ├── r13: fd02:1::e
 ├── r14: fd02:1::f
 ├── r15: fd02:1::10
-└── r16: fd02:1::11 (SSH enabled, egress)
+└── r16: fd02:1::11 (SSH有効、イーグレス)
 
-External Networks:
+外部ネットワーク:
 ├── UPF-R1:    fd00:1::/64 (macvlan, UPF: fd00:1::1, R1: fd00:1::12)
 └── R16-Server: fd03:1::/64 (macvlan, R16: fd03:1::11, Server: fd03:1::2)
 ```
 
-### Path Examples
-**High Priority Path (rt_table1)**: 
-- Forward: UPF → r1 → r2 → r4 → r7 → r11 → r14 → r16 → Server
-- SID List example: `[fd01:1::12, fd01:2::12, fd01:3::12, ...]`
+### 経路例
+**高優先度経路 (rt_table1)**:
+- 往路: UPF → r1 → r2 → r4 → r7 → r11 → r14 → r16 → Server
+- SIDリスト例: `[fd01:1::12, fd01:2::12, fd01:3::12, ...]`
 
-**Alternative Paths**:
-- Via r3: r1 → r3 → r5 → r8 → r12 → r15 → r16
-- Via r6: r1 → r3 → r6 → r9 → r13 → r15 → r16
+**代替経路**:
+- r3経由: r1 → r3 → r5 → r8 → r12 → r15 → r16
+- r6経由: r1 → r3 → r6 → r9 → r13 → r15 → r16
 
-## 🛠️ Advanced Usage
+## 🛠️ 高度な使用法
 
-### Manual Phase Execution
+### 手動フェーズ実行
 ```bash
-# Run individual setup phases
+# 個別セットアップフェーズの実行
 sudo docker exec -it controller python3 /opt/app/srv6-path-orchestrator/r1_phase1_table_setup.py
 sudo docker exec -it controller python3 /opt/app/srv6-path-orchestrator/r1_phase2_nftables_setup.py
 sudo docker exec -it controller python3 /opt/app/srv6-path-orchestrator/r16_phase1_table_setup.py
 sudo docker exec -it controller python3 /opt/app/srv6-path-orchestrator/r16_phase2_nftables_setup.py
 ```
 
-### Real-time Orchestration Modes
+### リアルタイムオーケストレーションモード
 ```bash
-# Bidirectional monitoring (recommended)
+# 双方向監視（推奨）
 python3 /opt/app/srv6-path-orchestrator/phase3_realtime_multi_table.py --mode bidirectional
 
-# Forward path only
+# 可視化付き双方向監視
+python3 /opt/app/srv6-path-orchestrator/phase3_realtime_multi_table.py --mode bidirectional --visualize
+
+# 往路のみ
 python3 /opt/app/srv6-path-orchestrator/phase3_realtime_multi_table.py --mode forward
 
-# Traffic analysis only
+# トラフィック分析のみ
 python3 /opt/app/srv6-path-orchestrator/phase3_realtime_multi_table.py --mode analyze --once
 
-# Custom update interval  
+# カスタム更新間隔
 python3 /opt/app/srv6-path-orchestrator/phase3_realtime_multi_table.py --interval 30
 ```
 
-### Testing & Debugging
+### 設定パラメータ
+`phase3_realtime_multi_table.py` 内で以下のパラメータをカスタマイズ可能:
+
+```python
+# 履歴保存先ディレクトリ名（visualization/以下のパス）
+HISTORY_SAVE_DIR = "srv6_evaluation3_tcp"
+
+# 測定停止時間（分）- この時間が経過すると自動停止
+MEASUREMENT_DURATION_MINUTES = 52
+```
+
+### テスト & デバッグ
 ```bash
-# Verify nftables rules
+# nftablesルールの確認
 sudo docker exec -it r1 nft list table ip6 mangle
 sudo docker exec -it r16 nft list table ip6 mangle_r16
 
-# Check routing tables
+# ルーティングテーブルの確認
 sudo docker exec -it r1 ip -6 route show table rt_table1
 sudo docker exec -it r16 ip -6 route show table rt_table_1
 
-# Check bandwidth control settings
+# 帯域制御設定の確認
 sudo docker exec -it r1 tc qdisc show
 sudo docker exec -it r1 tc class show dev eth0
 
-# Monitor RRD data
+# RRDデータの監視
 sudo docker exec -it controller rrdtool fetch /opt/app/mrtg/mrtg_file/r1-r2.rrd AVERAGE --start -60s
 
-# List all monitored links
+# 監視対象リンクの一覧
 sudo docker exec -it controller ls /opt/app/mrtg/mrtg_file/*.rrd
 ```
 
-### Performance Testing
+### 性能テスト
 ```bash
-# iperf3 throughput test (requires iperf3 installation)
-# On server side:
+# iperf3スループットテスト（iperf3のインストールが必要）
+# サーバー側:
 iperf3 -s -6
 
-# On client side:
+# クライアント側:
 iperf3 -c fd03:1::2 -6 -t 30 -P 4
 
-# Monitor tc statistics during test
+# テスト中のtc統計監視
 watch -n 1 'sudo docker exec r1 tc -s class show dev eth0'
 ```
 
-## 📊 System Monitoring & Analytics
+## 📊 システム監視と分析
 
-### Real-time Metrics Collection
-- **Link Utilization**: Per-link traffic analysis via SNMP/RRD (27 monitored links)
-- **Path Performance**: Latency and throughput per routing table
-- **Route Changes**: Automatic logging of path switching events
-- **Load Distribution**: Traffic distribution across multiple tables
-- **Bandwidth Usage**: HTB class statistics for each interface
+### リアルタイムメトリクス収集
+- **リンク利用率**: SNMP/RRDによるリンク別トラフィック分析（24リンク監視）
+- **経路性能**: ルーティングテーブル別のレイテンシとスループット
+- **ルート変更**: 経路切り替えイベントの自動ログ
+- **負荷分散**: 複数テーブル間のトラフィック分布
+- **帯域使用量**: 各インターフェースのHTBクラス統計
 
-### Observable Behaviors
+### 観測可能な動作
 ```bash
-# Expected system responses to traffic:
-1. High traffic on r1→r2 → System switches to alternative path (r1→r3→...)
-2. Link congestion detected → Alternative paths activated across mesh
-3. Path oscillation → System stabilizes on optimal route
-4. Bidirectional independence → Forward/return paths optimized separately
-5. Multi-hop optimization → 16-router mesh allows many alternative paths
+# トラフィックに対するシステムの期待される応答:
+1. r1→r2の高トラフィック → システムが代替経路(r1→r3→...)に切り替え
+2. リンク輻輳検出 → メッシュ全体で代替経路を活性化
+3. 経路振動 → システムが最適ルートで安定化
+4. 双方向独立 → 往路/復路が別々に最適化
+5. マルチホップ最適化 → 16台ルータメッシュで多数の代替経路が可能
 ```
 
-## 🔬 Research Applications
+## 🔬 研究応用
 
-### Academic Use Cases
-- **SRv6 Performance Evaluation**: Throughput, latency, and path convergence under various conditions
-- **Traffic Engineering**: Multi-path routing optimization algorithms with 16-router mesh
-- **SDN Integration**: Centralized control plane with distributed data plane
-- **Network Simulation**: Realistic testbed for routing protocol research
-- **QoS Research**: Multi-table routing with flow label-based classification
+### 学術的ユースケース
+- **SRv6性能評価**: 様々な条件下でのスループット、レイテンシ、経路収束
+- **トラフィックエンジニアリング**: 16台ルータメッシュでのマルチパスルーティング最適化アルゴリズム
+- **SDN統合**: 分散データプレーンを持つ集中制御プレーン
+- **ネットワークシミュレーション**: ルーティングプロトコル研究のための現実的なテストベッド
+- **QoS研究**: フローラベルベースの分類によるマルチテーブルルーティング
 
-### Key Research Features
-- **Reproducible Results**: Containerized environment ensures consistency
-- **Comprehensive Logging**: Detailed path change and performance logs
-- **Flexible Configuration**: Easy modification of routing policies
-- **Standards Compliance**: Pure IPv6 + SRv6 implementation
-- **Scalable Design**: 16-router mesh with 27 monitored links
-- **Performance Testing**: 1Gbps bandwidth control with optimized settings
+### 主な研究機能
+- **再現可能な結果**: コンテナ化環境による一貫性の確保
+- **包括的ログ**: 詳細な経路変更と性能ログ
+- **柔軟な設定**: ルーティングポリシーの容易な変更
+- **標準準拠**: 純粋なIPv6 + SRv6実装
+- **スケーラブル設計**: 24リンク監視を持つ16台ルータメッシュ
+- **性能テスト**: 最適化設定による1Gbps帯域制御
 
-## 🚨 Troubleshooting
+## 🚨 トラブルシューティング
 
-### Common Issues
+### よくある問題
 
-#### 1. Container Startup Issues
+#### 1. コンテナ起動問題
 ```bash
-# Check all containers are running
+# 全コンテナの起動確認
 sudo docker ps -a
 
-# View container logs
+# コンテナログの確認
 sudo docker logs r1
 sudo docker logs controller
 
-# Restart specific container
+# 特定コンテナの再起動
 sudo docker restart r1
 ```
 
-#### 2. Auto-Initialization Failures
+#### 2. 自動初期化失敗
 ```bash
-# Check auto-initialization logs
+# 自動初期化ログの確認
 sudo docker logs controller
 
-# Manual retry if auto-init failed
+# 自動初期化失敗時の手動リトライ
 sudo docker exec -it controller python3 /opt/app/init_setup.py
 ```
 
-#### 3. SSH Connection Failures  
+#### 3. SSH接続失敗
 ```bash
-# Check SSH service on routers
+# ルータのSSHサービス確認
 sudo docker exec -it r1 service ssh status
 sudo docker exec -it r16 service ssh status
 
-# Restart SSH if needed
+# 必要に応じてSSHを再起動
 sudo docker exec -it r1 service ssh restart
 sudo docker exec -it r16 service ssh restart
 ```
 
-#### 4. nftables Rule Conflicts
+#### 4. nftablesルール競合
 ```bash
-# View current rules
+# 現在のルールを確認
 sudo docker exec -it r1 nft list ruleset | grep -A 20 mangle
 
-# Flush and recreate
+# フラッシュして再作成
 sudo docker exec -it r1 nft flush table ip6 mangle
 sudo docker exec -it controller python3 /opt/app/srv6-path-orchestrator/r1_phase2_nftables_setup.py
 ```
 
-#### 5. Bandwidth Control Issues
+#### 5. 帯域制御問題
 ```bash
-# Check tc settings
+# tc設定の確認
 sudo docker exec -it r1 tc qdisc show
 sudo docker exec -it r1 tc class show dev eth0
 
-# Verify burst settings (should show ~15k)
+# burst設定の確認（約15kが表示されるはず）
 sudo docker exec -it r1 tc class show dev eth0 | grep burst
 
-# Check for overlimits (indicates bandwidth saturation)
+# overlimitsの確認（帯域飽和を示す）
 sudo docker exec -it r1 tc -s class show dev eth0
 ```
 
-#### 6. RRD Data Collection Issues
+#### 6. RRDデータ収集問題
 ```bash
-# Check RRD file existence (should be 27 files)
+# RRDファイルの存在確認（24ファイルあるはず）
 sudo docker exec -it controller ls -la /opt/app/mrtg/mrtg_file/*.rrd | wc -l
 
-# Test RRD data fetch
+# RRDデータフェッチのテスト
 sudo docker exec -it controller rrdtool fetch /opt/app/mrtg/mrtg_file/r1-r2.rrd AVERAGE --start -60s
 ```
 
-### System Reset
+### システムリセット
 ```bash
-# Complete environment reset
+# 環境の完全リセット
 sudo docker compose down
 sudo docker system prune -f
 sudo docker volume prune -f
 sudo docker compose build --no-cache
 sudo docker compose up -d
 
-# Wait for auto-initialization (30-60 seconds)
+# 自動初期化を待機（30-60秒）
 sudo docker logs -f controller
 ```
 
-### Diagnostic Commands Cheat Sheet
+### 診断コマンド チートシート
 ```bash
-# Quick health check
+# クイックヘルスチェック
 sudo docker exec -it r1 nft list table ip6 mangle | grep flowlabel
 sudo docker exec -it r16 nft list table ip6 mangle_r16 | grep flowlabel
 sudo docker exec -it r1 ip -6 rule list | grep fwmark
 sudo docker exec -it r16 ip -6 rule list | grep fwmark
 
-# Check bandwidth control
+# 帯域制御の確認
 sudo docker exec -it r1 tc class show dev eth0 | grep rate
 
-# Verify Phase 1 & 2 completion
+# Phase 1 & 2 完了の確認
 sudo docker logs controller | grep "✅"
 
-# Test end-to-end (from external UPF/Server)
+# エンドツーエンドテスト（外部UPF/サーバーから）
 ping6 -c 3 fd03:1::2   # UPF → Server
 ping6 -c 3 fd00:1::1   # Server → UPF
 ```
 
-## 🤝 Contributing
+## 🤝 コントリビューション
 
-1. Fork the repository
-2. Create feature branches for new routing algorithms
-3. Test in containerized environment
-4. Document performance improvements
-5. Submit pull requests with test results
+1. リポジトリをフォーク
+2. 新しいルーティングアルゴリズム用のフィーチャーブランチを作成
+3. コンテナ化環境でテスト
+4. 性能改善を文書化
+5. テスト結果とともにプルリクエストを送信
 
-## 📄 License & Citation
+## 📄 ライセンス & 引用
 
-This project is developed for academic research on SRv6 dynamic routing systems.
+このプロジェクトはSRv6動的ルーティングシステムの学術研究のために開発されています。
 
 ```bibtex
 @misc{srv6_performance_evaluation_2025,
@@ -635,14 +623,14 @@ This project is developed for academic research on SRv6 dynamic routing systems.
 }
 ```
 
-## 🔍 Technical References
+## 🔍 技術リファレンス
 
-### Standards & Protocols
+### 標準 & プロトコル
 - [RFC 8754: IPv6 Segment Routing Header (SRH)](https://tools.ietf.org/html/rfc8754)
 - [RFC 8986: Segment Routing over IPv6 (SRv6) Network Programming](https://tools.ietf.org/html/rfc8986)
 - [Linux SRv6 Implementation Guide](https://www.kernel.org/doc/html/latest/networking/seg6-sysctl.html)
 
-### Implementation Tools  
+### 実装ツール
 - [iproute2: Linux Advanced Routing](https://wiki.linuxfoundation.org/networking/iproute2)
 - [nftables: Linux Firewall Framework](https://netfilter.org/projects/nftables/)
 - [tc-htb: Hierarchical Token Bucket](https://man7.org/linux/man-pages/man8/tc-htb.8.html)
@@ -651,5 +639,4 @@ This project is developed for academic research on SRv6 dynamic routing systems.
 
 ---
 
-**System Status**: ✅ Production Ready | 🔄 Real-time Monitoring Active | 🚀 Auto-Initialization Enabled | ⚡ 1Gbps Bandwidth Control | 🌐 16-Router Mesh Topology
-# srv6_dynamic_routing_performance3_evaluation_system
+**システム状態**: ✅ 本番稼働可能 | 🔄 リアルタイム監視有効 | 🚀 自動初期化有効 | ⚡ 1Gbps帯域制御 | 🌐 16台ルータメッシュトポロジ | 🖼️ トポロジ可視化対応
