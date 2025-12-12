@@ -37,7 +37,7 @@ warnings.filterwarnings('ignore', message='.*Glyph.*missing from.*font.*')
 # 設定変数（ここでカスタマイズ可能）
 # ============================================================================
 # 履歴保存先ディレクトリ名（visualization/以下のパス）
-HISTORY_SAVE_DIR = "srv6_evaluation3_tcp"
+HISTORY_SAVE_DIR = "srv6_evaluation3_udp/trial1"
 
 # 測定停止時間（分）- この時間が経過すると自動停止
 MEASUREMENT_DURATION_MINUTES = 52
