@@ -34,7 +34,7 @@ warnings.filterwarnings('ignore', message='.*Glyph.*missing from.*font.*')
 # ============================================================================
 # 設定変数
 # ============================================================================
-HISTORY_SAVE_DIR = "srv6_evaluation3_udp/test1"
+HISTORY_SAVE_DIR = "srv6_evaluation3_udp/trial3"
 MEASUREMENT_DURATION_MINUTES = 52
 
 # ============================================================================
