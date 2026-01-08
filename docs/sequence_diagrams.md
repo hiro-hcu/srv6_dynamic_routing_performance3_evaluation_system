@@ -1,13 +1,14 @@
 # SRv6 動的経路制御システム シーケンス図
 
 > **作成日**: 2026年1月7日  
+> **更新日**: 2026年1月8日（最適化版対応）  
 > **対象**: プロジェクト全体アーキテクチャおよび転送エージェント
 
 ---
 
 ## 📊 システム全体アーキテクチャ
 
-### コンポーネント構成
+### コンポーネント構成（最適化版）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -15,22 +16,30 @@
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────┐    │
-│  │                    SRv6 Path Orchestrator                                │    │
+│  │                      SRv6PathManager (メイン制御)                        │    │
 │  │                                                                          │    │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │    │
-│  │  │トラフィック  │  │   経路計算部  │  │   経路更新部  │  │  可視化部   │ │    │
-│  │  │  収集部      │  │ PathCalculator│  │RoutingTable  │  │ Topology    │ │    │
-│  │  │RRDDataManager│→ │              │→ │   Manager    │  │ Visualizer  │ │    │
-│  │  └──────┬───────┘  └──────────────┘  └──────┬───────┘  └─────────────┘ │    │
-│  │         │                                    │                          │    │
-│  └─────────┼────────────────────────────────────┼──────────────────────────┘    │
-│            │                                    │                               │
-│  ┌─────────▼───────┐                  ┌─────────▼───────┐                      │
-│  │  RRDtool/MRTG   │                  │  SSH Connection │                      │
-│  │  (RRDファイル)   │                  │     Manager     │                      │
-│  └─────────────────┘                  └─────────────────┘                      │
-│                                                                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
+│  │  ┌──────────────────────────────────────────────┐  ┌─────────────────┐  │    │
+│  │  │              NetworkGraph                     │  │ TopologyVisualizer│ │    │
+│  │  │  ┌─────────────┐  ┌────────────────────────┐ │  │  (可視化部)       │ │    │
+│  │  │  │ トラフィック │  │     経路計算           │ │  │  • visualize()    │ │    │
+│  │  │  │ 収集・重み更新│  │ • calculate_paths()   │ │  │  • PNG保存        │ │    │
+│  │  │  │ • _fetch_rrd │  │ • path_to_sid_list()  │ │  └─────────────────┘  │    │
+│  │  │  │ • update_    │  │ • Dijkstra法          │ │                        │    │
+│  │  │  │   weights_   │  └────────────────────────┘ │  ┌─────────────────┐  │    │
+│  │  │  │   from_rrd() │                             │  │   SSHManager    │  │    │
+│  │  │  └─────────────┘                              │  │  • connect()    │  │    │
+│  │  └───────────────────────────────────────────────┘  │  • execute()    │  │    │
+│  │                                                      └─────────────────┘  │    │
+│  │  メソッド: update_bidirectional_tables(), _create_table_routes(),        │    │
+│  │           _update_tables(), _detect_path_changes(), cleanup()             │    │
+│  └───────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                   │
+│  ┌───────────────────┐                  ┌───────────────────────────────────┐    │
+│  │   RRDtool/MRTG    │                  │          SRv6Config               │    │
+│  │   (RRDファイル)    │                  │  • RRD_PATHS, SEGMENT_MAP, EDGES │    │
+│  └───────────────────┘                  └───────────────────────────────────┘    │
+│                                                                                   │
+└───────────────────────────────────────────────────────────────────────────────────┘
                 │                                        │
        SNMP (UDP 161)                          SSH (TCP 22)
        トラフィック収集                        経路設定コマンド
@@ -63,15 +72,18 @@
 
 ## 📋 用語定義
 
-### Controller側コンポーネント
+### Controller側コンポーネント（最適化版）
 
-| コンポーネント | 説明 | 実装 |
-|---------------|------|------|
+| コンポーネント | 説明 | 実装クラス/メソッド |
+|---------------|------|--------------------|
 | **MRTG** | Multi Router Traffic Grapher。SNMPで収集したトラフィックデータを定期収集 | `mrtg_kurage.conf` |
 | **RRD** | Round Robin Database。時系列トラフィックデータの格納 | `mrtg_file/*.rrd` |
-| **トラフィック収集部** | RRDファイルからエッジ利用率を取得し、グラフの重みを更新 | `RRDDataManager` クラス |
-| **経路計算部** | Dijkstra法に基づく複数経路計算、SIDリスト生成 | `PathCalculator` クラス |
-| **経路更新部** | SSH経由でルータのルーティングテーブルを動的更新 | `RoutingTableManager` + `SSHConnectionManager` |
+| **SRv6Config** | 設定情報一元管理（SSH設定、RRDパス、セグメントマップ、エッジ定義） | `SRv6Config` データクラス |
+| **NetworkGraph** | トポロジ管理 + RRDデータ取得 + 経路計算を統合 | `NetworkGraph` クラス |
+| **トラフィック収集** | RRDファイルからエッジ利用率を取得し、グラフの重みを更新 | `NetworkGraph.update_weights_from_rrd()` |
+| **経路計算** | Dijkstra法に基づく複数経路計算、SIDリスト生成 | `NetworkGraph.calculate_paths()`, `path_to_sid_list()` |
+| **経路更新** | SSH経由でルータのルーティングテーブルを動的更新 | `SRv6PathManager._update_tables()` + `SSHManager` |
+| **可視化** | トポロジと選択経路をPNG画像として保存 | `TopologyVisualizer` クラス |
 
 ### Agent側コンポーネント
 
@@ -160,94 +172,112 @@ sequenceDiagram
 
 ---
 
-## 🔄 シーケンス図 2: リアルタイム経路制御サイクル (Phase 3)
+## 🔄 シーケンス図 2: リアルタイム経路制御サイクル (Phase 3) - 最適化版
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Main as SRv6PathManager
-    participant RRD as RRDDataManager<br/>(トラフィック収集部)
-    participant PC as PathCalculator<br/>(経路計算部)
-    participant RTM as RoutingTableManager<br/>(経路更新部)
-    participant SSH as SSHConnectionManager
+    participant Main as main()
+    participant PM as SRv6PathManager
+    participant NG as NetworkGraph<br/>(トポロジ+経路計算)
+    participant SSH as SSHManager
     participant R1 as Router r1<br/>(Linux Kernel)
     participant R16 as Router r16<br/>(Linux Kernel)
     participant Vis as TopologyVisualizer
 
+    Note over Main,Vis: === 初期化 ===
+    Main->>PM: __init__(enable_visualization)
+    PM->>NG: NetworkGraph(config)
+    NG->>NG: _build_topology() [16ノード, 24エッジ]
+    PM->>SSH: SSHManager(config)
+    opt 可視化有効時
+        PM->>Vis: TopologyVisualizer(graph)
+    end
+
     Note over Main,Vis: === 1分ごとの経路更新サイクル ===
     
     loop 毎分実行 (MEASUREMENT_DURATION_MINUTES まで)
-        Main->>RRD: update_edge_weights(graph)
+        Main->>PM: update_bidirectional_tables()
         
-        Note over RRD: トラフィック収集フェーズ
+        Note over PM,NG: トラフィック収集フェーズ
+        PM->>NG: update_weights_from_rrd()
         loop 全24エッジに対して
-            RRD->>RRD: fetch_rrd_data(rrd_path)
-            RRD->>RRD: rrdtool fetch AVERAGE --start -60s
-            RRD->>RRD: 利用率計算 (out_bytes / max_bandwidth)
-            RRD->>PC: graph[u][v]['weight'] = 利用率
+            NG->>NG: _fetch_rrd_data(rrd_path)
+            NG->>NG: rrdtool fetch AVERAGE --start -60s
+            NG->>NG: 利用率計算 (out_bytes / max_bandwidth)
+            NG->>NG: graph[u][v]['weight'] = max(utilization, 0.0001)
         end
-        RRD-->>Main: 重み更新完了
+        NG-->>PM: 重み更新完了 (True/False)
         
-        Note over Main,PC: 経路計算フェーズ
-        Main->>PC: calculate_multiple_paths(src=1, dst=16, n=3)
+        Note over PM,NG: 経路計算フェーズ
+        PM->>NG: calculate_paths(src=1, dst=16, num_paths=3)
         
-        PC->>PC: Dijkstra法で最短経路1 (高優先度)
-        PC->>PC: 使用エッジの重み ×3.0
-        PC->>PC: Dijkstra法で最短経路2 (中優先度)
-        PC->>PC: 使用エッジの重み ×2.0
-        PC->>PC: Dijkstra法で最短経路3 (低優先度)
+        NG->>NG: Dijkstra法で最短経路1 (高優先度)
+        NG->>NG: 使用エッジの重み ×3.0
+        NG->>NG: Dijkstra法で最短経路2 (中優先度)
+        NG->>NG: 使用エッジの重み ×2.0
+        NG->>NG: Dijkstra法で最短経路3 (低優先度)
         
-        PC-->>Main: [(path1, cost1), (path2, cost2), (path3, cost3)]
+        NG-->>PM: calculated_paths = [(path1, cost1), (path2, cost2), (path3, cost3)]
         
-        Note over Main,RTM: 経路設定フェーズ (往路: r1)
-        Main->>RTM: create_table_routes(forward_path)
-        RTM->>PC: path_to_sid_list(path, is_return=False)
-        PC-->>RTM: [SID1, SID2, ...], interface
-        RTM-->>Main: [TableRoute1, TableRoute2, TableRoute3]
+        Note over PM,SSH: 往路テーブル生成・更新 (r1)
+        PM->>PM: _create_table_routes(is_return=False)
+        PM->>NG: path_to_sid_list(path, is_return=False)
+        NG-->>PM: [SID1, SID2, ...], interfaces, output_interface
+        PM->>PM: forward_routes = [TableRoute1, TableRoute2, TableRoute3]
         
-        Main->>RTM: update_all_tables(forward_routes)
-        RTM->>SSH: r1_connection()
-        SSH->>R1: SSH接続 (fd02:1::2)
+        PM->>PM: _update_tables(forward_routes, is_return=False)
+        PM->>SSH: connect(r1_host: fd02:1::2)
+        SSH->>R1: SSH接続確立
         
         loop 各テーブル (rt_table1/2/3)
-            RTM->>SSH: execute_command(clear_route)
-            SSH->>R1: ip -6 route del ... table rt_tableX
-            R1-->>SSH: OK
-            
-            RTM->>SSH: execute_command(add_route)
-            SSH->>R1: ip -6 route add fd03:1::/64 encap seg6 mode encap segs SID1,SID2,... dev ethX table rt_tableX
+            PM->>SSH: execute(client, "ip -6 route show table rt_tableX")
+            SSH->>R1: 既存経路確認
+            R1-->>SSH: 経路リスト
+            PM->>SSH: execute(client, "ip -6 route del ...")
+            SSH->>R1: 既存経路削除
+            PM->>SSH: execute(client, "ip -6 route add fd03:1::/64 encap seg6 ...")
+            SSH->>R1: 新経路追加
             R1->>R1: カーネルルーティングテーブル更新
             R1-->>SSH: OK
         end
-        SSH-->>RTM: 更新完了
-        RTM-->>Main: 往路更新成功
+        SSH-->>PM: 往路更新成功
         
-        Note over Main,RTM: 経路設定フェーズ (復路: r16)
-        Main->>RTM: create_return_table_routes(reverse_path)
-        RTM->>PC: path_to_sid_list(path, is_return=True)
-        PC-->>RTM: [SID1, SID2, ...], interface
+        Note over PM,SSH: 復路テーブル生成・更新 (r16)
+        PM->>PM: _create_table_routes(is_return=True)
+        PM->>NG: path_to_sid_list(reversed_path, is_return=True)
+        NG-->>PM: [SID1, SID2, ...], interfaces, output_interface
+        PM->>PM: return_routes = [TableRoute_1, TableRoute_2, TableRoute_3]
         
-        Main->>RTM: update_return_tables(return_routes)
-        RTM->>SSH: r16_connection()
-        SSH->>R16: SSH接続 (fd02:1::11)
+        PM->>PM: _update_tables(return_routes, is_return=True)
+        PM->>SSH: connect(r16_host: fd02:1::11)
+        SSH->>R16: SSH接続確立
         
         loop 各テーブル (rt_table_1/2/3)
-            RTM->>SSH: execute_command(add_route)
-            SSH->>R16: ip -6 route add fd00:1::/64 encap seg6 mode encap segs ... table rt_table_X
+            PM->>SSH: execute(client, "ip -6 route add fd00:1::/64 encap seg6 ...")
+            SSH->>R16: 新経路追加
             R16->>R16: カーネルルーティングテーブル更新
             R16-->>SSH: OK
         end
-        RTM-->>Main: 復路更新成功
+        SSH-->>PM: 復路更新成功
         
-        Note over Main,Vis: 可視化フェーズ
-        Main->>Vis: visualize(paths, update_count)
-        Vis->>Vis: トポロジ描画 + 経路ハイライト
-        Vis->>Vis: 画像保存 (topology_latest.png)
-        Vis->>Vis: 履歴保存 (N_minutes.png)
-        Vis-->>Main: 可視化完了
+        Note over PM,Vis: 可視化フェーズ (オプション)
+        opt enable_visualization = True
+            PM->>Vis: visualize(paths=calculated_paths, update_count)
+            Vis->>Vis: ax.clear() + トポロジ描画
+            Vis->>Vis: 経路をred/orange/greenでハイライト
+            Vis->>Vis: 画像保存 (topology_latest.png)
+            Vis->>Vis: 履歴保存 (N_minutes.png)
+            Vis-->>PM: 可視化完了
+        end
         
-        Main->>Main: sleep(60秒)
+        PM-->>Main: 更新成功 (True/False)
+        Main->>Main: sleep(interval - elapsed)
     end
+    
+    Note over Main,Vis: === 終了処理 ===
+    Main->>PM: cleanup()
+    PM->>Vis: close()
 ```
 
 ---
@@ -373,18 +403,20 @@ sequenceDiagram
 
 ---
 
-## 📐 コンポーネント関係図
+## 📐 コンポーネント関係図（最適化版）
 
 ```mermaid
 graph TB
     subgraph Controller["Controller (Docker Container)"]
-        subgraph Orchestrator["SRv6 Path Orchestrator"]
-            PM[SRv6PathManager<br/>メイン制御]
-            RDM[RRDDataManager<br/>トラフィック収集部]
-            PC[PathCalculator<br/>経路計算部]
-            RTM[RoutingTableManager<br/>経路更新部]
-            SSH[SSHConnectionManager]
-            TV[TopologyVisualizer<br/>可視化部]
+        subgraph Config["設定"]
+            CFG[SRv6Config<br/>• RRD_PATHS<br/>• SEGMENT_MAP<br/>• EDGES<br/>• SSH設定]
+        end
+        
+        subgraph Orchestrator["SRv6PathManager (メイン制御)"]
+            PM[update_bidirectional_tables<br/>_create_table_routes<br/>_update_tables<br/>_detect_path_changes]
+            NG[NetworkGraph<br/>• update_weights_from_rrd<br/>• calculate_paths<br/>• path_to_sid_list]
+            SSH[SSHManager<br/>• connect<br/>• execute]
+            TV[TopologyVisualizer<br/>• visualize<br/>• close]
         end
         
         subgraph DataStore["データストア"]
@@ -392,12 +424,12 @@ graph TB
             RRD[(RRDファイル<br/>時系列DB)]
         end
         
-        PM --> RDM
-        PM --> PC
-        PM --> RTM
+        CFG --> PM
+        CFG --> NG
+        PM --> NG
+        PM --> SSH
         PM --> TV
-        RTM --> SSH
-        RDM --> RRD
+        NG --> RRD
         MRTG --> RRD
     end
     
@@ -442,28 +474,29 @@ graph TB
     └───────────┘                   │              │                  │
                                     │              ▼                  │
                                     │  ┌─────────────────────────┐   │
-                                    │  │ トラフィック収集部       │   │
-                                    │  │ (RRDDataManager)        │   │
-                                    │  │ - rrdtool fetch         │   │
-                                    │  │ - 利用率計算            │   │
-                                    │  │ - エッジ重み更新        │   │
+                                    │  │    NetworkGraph          │   │
+                                    │  │  (トポロジ+経路計算統合)  │   │
+                                    │  │ - update_weights_from_rrd│   │
+                                    │  │ - _fetch_rrd_data        │   │
+                                    │  │ - calculate_paths        │   │
+                                    │  │ - path_to_sid_list       │   │
                                     │  └───────────┬─────────────┘   │
                                     │              │                  │
                                     │              ▼                  │
                                     │  ┌─────────────────────────┐   │
-                                    │  │ 経路計算部               │   │
-                                    │  │ (PathCalculator)        │   │
-                                    │  │ - Dijkstra法            │   │
-                                    │  │ - 3経路選択             │   │
-                                    │  │ - SIDリスト生成         │   │
+                                    │  │  SRv6PathManager         │   │
+                                    │  │ - update_bidirectional_  │   │
+                                    │  │   tables()               │   │
+                                    │  │ - _create_table_routes() │   │
+                                    │  │ - _update_tables()       │   │
                                     │  └───────────┬─────────────┘   │
                                     │              │                  │
                                     │              ▼                  │
                                     │  ┌─────────────────────────┐   │
-                                    │  │ 経路更新部               │   │
-                                    │  │ (RoutingTableManager)   │   │
-                                    │  │ - SSH接続               │   │
-                                    │  │ - ip route コマンド     │   │
+                                    │  │      SSHManager          │   │
+                                    │  │  - connect()             │   │
+                                    │  │  - execute()             │   │
+                                    │  │  - ip -6 route コマンド  │   │
                                     │  └───────────┬─────────────┘   │
                                     │              │                  │
                                     └──────────────┼──────────────────┘
