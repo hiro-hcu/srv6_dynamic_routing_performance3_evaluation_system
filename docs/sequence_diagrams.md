@@ -407,73 +407,54 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph Controller["🖥️ Controller (Docker Container)"]
-        direction TB
-        
-        subgraph Config["⚙️ 設定クラス"]
-            CFG["<b>SRv6Config</b><br/>(データクラス)<br/>━━━━━━━━━━━<br/>• RRD_PATHS<br/>• SEGMENT_MAP<br/>• EDGES<br/>• SSH設定<br/>• テーブル定義"]
+    subgraph Controller["Controller (Docker Container)"]
+        subgraph Orchestrator["SRv6PathManager (統合オーケストレーター)"]
+            PM[SRv6PathManager<br/>メイン制御]
+            NG[NetworkGraph<br/>トポロジ+経路計算+RRD統合]
+            SSH[SSHManager<br/>SSH接続管理]
+            TV[TopologyVisualizer<br/>可視化部]
+            CFG[SRv6Config<br/>設定データクラス]
         end
         
-        subgraph Manager["🎯 メイン制御"]
-            PM["<b>SRv6PathManager</b><br/>━━━━━━━━━━━<br/>• update_bidirectional_tables()<br/>• _create_table_routes()<br/>• _update_tables()<br/>• _detect_path_changes()"]
+        subgraph DataStore["データストア"]
+            MRTG[MRTG<br/>トラフィック収集]
+            RRD[(RRDファイル<br/>時系列DB)]
         end
         
-        subgraph Components["🔧 内部コンポーネント"]
-            NG["<b>NetworkGraph</b><br/>(トポロジ+経路計算)<br/>━━━━━━━━━━━<br/>• update_weights_from_rrd()<br/>• calculate_paths()<br/>• path_to_sid_list()"]
-            SSH["<b>SSHManager</b><br/>(SSH接続管理)<br/>━━━━━━━━━━━<br/>• connect()<br/>• execute()"]
-            TV["<b>TopologyVisualizer</b><br/>(可視化)<br/>━━━━━━━━━━━<br/>• visualize()<br/>• close()"]
-        end
-        
-        subgraph DataStore["💾 データストア"]
-            MRTG["<b>MRTG</b><br/>(cron 1分間隔)"]
-            RRD[("<b>RRDファイル</b><br/>時系列トラフィックDB<br/>24エッジ分")]
-        end
-        
-        CFG -.->|参照| PM
-        CFG -.->|参照| NG
-        PM ==>|制御| NG
-        PM ==>|制御| SSH
-        PM ==>|制御| TV
-        NG -->|読み取り| RRD
-        MRTG -->|更新| RRD
+        PM --> NG
+        PM --> SSH
+        PM --> TV
+        PM --> CFG
+        NG --> CFG
+        NG --> RRD
+        MRTG --> RRD
     end
     
-    subgraph Agent["🔌 Agent (Router r1/r16)"]
-        direction TB
-        
-        subgraph Monitor["📊 監視"]
-            SNMPD["<b>SNMP Agent</b><br/>(snmpd)<br/>━━━━━━━━━━━<br/>• ifHCInOctets<br/>• ifHCOutOctets"]
+    subgraph Agent["Agent (Router r1/r16)"]
+        subgraph SNMP["トラフィック提供"]
+            SNMPD[SNMP Agent<br/>snmpd]
         end
         
-        subgraph Kernel["🐧 Linux Kernel"]
-            NFT["<b>nftables</b><br/>━━━━━━━━━━━<br/>FlowLabel → fwmark"]
-            IPRULE["<b>ip rule</b><br/>━━━━━━━━━━━<br/>fwmark → table"]
-            RTTBL[("<b>ルーティングテーブル</b><br/>rt_table1/2/3<br/>rt_table_1/2/3")]
-            SRV6["<b>SRv6 encap</b><br/>━━━━━━━━━━━<br/>Segment Routing<br/>カプセル化"]
+        subgraph Kernel["Linux Kernel"]
+            NFT[nftables<br/>FlowLabel→fwmark]
+            IPRULE[ip rule<br/>fwmark→table]
+            RTTBL[(ルーティング<br/>テーブル)]
+            SRV6[SRv6 encap<br/>Segment Routing]
         end
         
-        NFT -->|fwmark設定| IPRULE
-        IPRULE -->|テーブル選択| RTTBL
-        RTTBL -->|経路参照| SRV6
+        NFT --> IPRULE
+        IPRULE --> RTTBL
+        RTTBL --> SRV6
     end
     
-    MRTG -.->|SNMP GET<br/>UDP 161| SNMPD
-    SSH -.->|SSH接続<br/>ip -6 route<br/>TCP 22| RTTBL
+    MRTG -.->|SNMP GET| SNMPD
+    SSH -.->|SSH/ip route| RTTBL
     
-    style Controller fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
-    style Agent fill:#fff8e1,stroke:#f57c00,stroke-width:3px
-    style Config fill:#f1f8e9,stroke:#689f38,stroke-width:2px
-    style Manager fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Components fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style DataStore fill:#e0f2f1,stroke:#00897b,stroke-width:2px
-    style Monitor fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    style Kernel fill:#fbe9e7,stroke:#d84315,stroke-width:2px
-    
-    style PM fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style NG fill:#e8eaf6,stroke:#3949ab,stroke-width:2px
-    style SSH fill:#e0f7fa,stroke:#00838f,stroke-width:2px
-    style TV fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style RRD fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    style Controller fill:#e1f5fe
+    style Agent fill:#fff3e0
+    style Orchestrator fill:#bbdefb
+    style DataStore fill:#c8e6c9
+    style Kernel fill:#ffe0b2
 ```
 
 ---
